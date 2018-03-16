@@ -164,6 +164,33 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+bool CheckLaneAvailability(int lane, double car_s, int prev_size, const vector<vector<double>> &sensor_fusion) {
+    bool available = true;
+
+    for (int i = 0; i<sensor_fusion.size(); i++)
+    {
+        // car is in my lane
+        // sensor_fusion: 0- 1- 2- 3-vx, 4-vy, 5-s, 6-d
+        float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
+        if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in the lane
+        {
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];
+
+            check_car_s += ((double) prev_size * .02 * check_speed);
+
+            //check s value greater than mine and s gap
+            if (abs(check_car_s - car_s)< 30) {
+                available = false;
+                break;
+            }
+        }
+    }
+    return available;
+}
+
 int main() {
   uWS::Hub h;
 
@@ -201,12 +228,16 @@ int main() {
   	map_waypoints_s.push_back(s);
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
+
   }
 
   // as the code in the project walkthrough video
+  int lane = 1;
+
+  double ref_vel = 1.0; //mph, initial speed avoid the jerk
 
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -214,8 +245,6 @@ int main() {
     //auto sdata = string(data).substr(0, length);
     //cout << sdata << endl;
 
-    int lane = 1;
-    double ref_vel = 49.5; //mph, reference velocity to target
 
     if (length && length > 2 && data[0] == '4' && data[1] == '2') {
 
@@ -256,6 +285,54 @@ int main() {
             /*
              * add more here....
              */
+
+            if (prev_size>0)
+            {
+                car_s = end_path_s;
+            }
+            bool too_close = false;
+
+            //find ref_v to use
+            for (int i = 0; i<sensor_fusion.size(); i++)
+            {
+                // car is in my lane
+                // sensor_fusion: 0- 1- 2- 3-vx, 4-vy, 5-s, 6-d
+                float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
+                if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in my lane
+                {
+                    double vx = sensor_fusion[i][3];
+                    double vy = sensor_fusion[i][4];
+                    double check_speed = sqrt(vx*vx + vy*vy);
+                    double check_car_s = sensor_fusion[i][5];
+
+                    check_car_s += ((double) prev_size * .02 * check_speed);
+
+                    //check s value greater than mine and s gap
+                    if ((check_car_s > car_s) && ((check_car_s - car_s)< 30)) {
+                        //do some logic here, lower reference velocity so we don't crash into the car in front of us
+                        // could also flag to change lanes;
+
+                        //?? how do I know how many lanes are currently in the road?
+
+                        too_close = true;
+                        if (lane>0 and CheckLaneAvailability(0, car_s, prev_size, sensor_fusion)) {
+                                lane=0;
+                            }
+                        if (lane==0 and CheckLaneAvailability(1, car_s, prev_size, sensor_fusion)) {
+                                lane = 1;
+                        }
+                    }
+                }
+            }
+
+            if (too_close)
+            {
+                ref_vel -= .224;
+            }
+            else if (ref_vel < 49.5)
+            {
+                ref_vel += .224 * pow(50.0/ref_vel, 0.3); //accerlation is faster when the speed is slow
+            }
 
             vector<double> ptsx;
             vector<double> ptsy;
@@ -342,7 +419,7 @@ int main() {
             // fill up the rest of our path planner after filling it with previous points, here we will always output 50 points
             for (int i=1; i<=50-previous_path_x.size(); i++)
             {
-                double N = (target_dist/(.02*ref_vel/2.24));
+                double N = (target_dist/(.02 * ref_vel /2.24));
                 double x_point = x_add_on + (target_x)/N;
                 double y_point = sp(x_point);
 
