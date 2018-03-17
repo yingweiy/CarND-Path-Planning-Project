@@ -52,7 +52,7 @@ int ClosestWaypoint(double x, double y, const vector<double> &maps_x, const vect
 		double dist = distance(x,y,map_x,map_y);
 		if(dist < closestLen)
 		{
-			closestLen = dist;
+			closestLen = dist;https://www.amazon.com/gp/cart/view.html/ref=nav_cart
 			closestWaypoint = i;
 		}
 
@@ -182,7 +182,7 @@ bool CheckLaneAvailability(int lane, double car_s, int prev_size, const vector<v
             check_car_s += ((double) prev_size * .02 * check_speed);
 
             //check s value greater than mine and s gap
-            if (abs(check_car_s - car_s)< 30) {
+            if (abs(check_car_s - car_s) < 30 ) {
                 available = false;
                 break;
             }
@@ -236,8 +236,11 @@ int main() {
 
   double ref_vel = 1.0; //mph, initial speed avoid the jerk
 
+  double speed_limit = 49.5;
 
-  h.onMessage([&ref_vel, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+
+
+  h.onMessage([&ref_vel, &speed_limit, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -291,12 +294,13 @@ int main() {
                 car_s = end_path_s;
             }
             bool too_close = false;
+            bool too_slow = false;
 
             //find ref_v to use
             for (int i = 0; i<sensor_fusion.size(); i++)
             {
                 // car is in my lane
-                // sensor_fusion: 0- 1- 2- 3-vx, 4-vy, 5-s, 6-d
+                // sensor_fusion: 0-ID 1-x 2-y 3-vx, 4-vy, 5-s, 6-d
                 float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
                 if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in my lane
                 {
@@ -308,18 +312,23 @@ int main() {
                     check_car_s += ((double) prev_size * .02 * check_speed);
 
                     //check s value greater than mine and s gap
-                    if ((check_car_s > car_s) && ((check_car_s - car_s)< 30)) {
-                        //do some logic here, lower reference velocity so we don't crash into the car in front of us
-                        // could also flag to change lanes;
-
-                        //?? how do I know how many lanes are currently in the road?
-
+                    if ((check_car_s > car_s) && (check_car_s - car_s)< 30)  //too close
+                    {
                         too_close = true;
-                        if (lane>0 and CheckLaneAvailability(0, car_s, prev_size, sensor_fusion)) {
+                    }
+
+                    if (too_close) {
+                        if (lane==1 and CheckLaneAvailability(0, car_s, prev_size, sensor_fusion)) {
                                 lane=0;
                             }
+                        else if (lane==1 and CheckLaneAvailability(2, car_s, prev_size, sensor_fusion)) {
+                            lane=2;
+                        }
                         if (lane==0 and CheckLaneAvailability(1, car_s, prev_size, sensor_fusion)) {
                                 lane = 1;
+                        }
+                        if (lane==2 and CheckLaneAvailability(1, car_s, prev_size, sensor_fusion)) {
+                            lane = 1;
                         }
                     }
                 }
@@ -329,10 +338,10 @@ int main() {
             {
                 ref_vel -= .224;
             }
-            else if (ref_vel < 49.5)
-            {
-                ref_vel += .224 * pow(50.0/ref_vel, 0.3); //accerlation is faster when the speed is slow
-            }
+            else if (ref_vel < speed_limit)
+                {
+                    ref_vel += .224 * pow(50.0/ref_vel, 0.3); //accerlation is faster when the speed is slow
+                }
 
             vector<double> ptsx;
             vector<double> ptsy;
