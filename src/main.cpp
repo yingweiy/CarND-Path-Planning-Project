@@ -164,8 +164,31 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
-bool CheckLaneAvailability(int lane, double car_s, int prev_size, const vector<vector<double>> &sensor_fusion) {
+double MinFrontDistance(int lane, double car_s, const vector<vector<double>> &sensor_fusion) {
+    double mindist = 1e4;
+    double dist = 1e4;
+    for (int i = 0; i<sensor_fusion.size(); i++)
+    {
+        float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
+        if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in the lane
+        {
+            // car is in the lane
+            double check_car_s = sensor_fusion[i][5];
+            if (check_car_s>car_s)
+            {
+                dist = check_car_s - car_s;
+            }
+            if (dist < mindist){
+                mindist = dist;
+            }
+        }
+    }
+    return mindist;
+}
+
+bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_size, const vector<vector<double>> &sensor_fusion) {
     bool available = true;
+    double safe_dist = 10;
 
     for (int i = 0; i<sensor_fusion.size(); i++)
     {
@@ -178,16 +201,40 @@ bool CheckLaneAvailability(int lane, double car_s, int prev_size, const vector<v
             double vy = sensor_fusion[i][4];
             double check_speed = sqrt(vx*vx + vy*vy);
             double check_car_s = sensor_fusion[i][5];
+            //double t = (double) prev_size * .02;
+            double t = 2; //assume two seconds lane changing
+            double check_car_sp; //projected check_car_s
+            double car_sp;  //projected car_s
+            check_car_sp = check_car_s + ( t * check_speed);
+            car_sp = car_s + (t * car_speed);
 
-            check_car_s += ((double) prev_size * .02 * check_speed);
-
-            //check s value greater than mine and s gap
-            if (abs(check_car_s - car_s) < 30 ) {
+            if ((check_car_sp >car_sp) && (car_sp > check_car_s-safe_dist))
+            {
                 available = false;
                 break;
             }
+
+            if ((check_car_sp > car_s - safe_dist) && (car_s-safe_dist > check_car_s - safe_dist))
+            {
+                available = false;
+                break;
+            }
+
+            if ((check_car_sp > car_sp) && (car_sp > check_car_s))
+            {
+                available = false;
+                break;
+            }
+
+            //check s value greater than mine and s gap
+            //if (abs(check_car_s - car_s) < safe_dist ) {
+            //}
         }
     }
+    if (available)
+        cout<<"target lane:"<<lane<<" safe!"<<endl;
+    else
+        cout<<"target lane:"<<lane<<" not safe!"<<endl;
     return available;
 }
 
@@ -233,14 +280,16 @@ int main() {
 
   // as the code in the project walkthrough video
   int lane = 1;
+  int target_lane = 1;
 
   double ref_vel = 1.0; //mph, initial speed avoid the jerk
 
   double speed_limit = 49.5;
 
+  int state = 0; //0-keep lane, 1-lane changing
 
 
-  h.onMessage([&ref_vel, &speed_limit, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&state, &target_lane, &ref_vel, &speed_limit, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -296,44 +345,74 @@ int main() {
             bool too_close = false;
             bool too_slow = false;
 
-            //find ref_v to use
-            for (int i = 0; i<sensor_fusion.size(); i++)
+            if (state==1) //if in changing lane state
             {
+                if ((car_d < 2 + 4 * target_lane + 2) && (car_d> 2+4*target_lane-2))   //if the car is in target lane
+                {
+                    state = 0; //go back to lane-keeping state
+                }
+            }
+
+            for (int i = 0; i<sensor_fusion.size(); i++) {
                 // car is in my lane
                 // sensor_fusion: 0-ID 1-x 2-y 3-vx, 4-vy, 5-s, 6-d
                 float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
-                if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in my lane
+                if ((d < 2 + 4 * lane + 2) && (d > 2 + 4 * lane - 2))   //if the car is in my lane
                 {
                     double vx = sensor_fusion[i][3];
                     double vy = sensor_fusion[i][4];
-                    double check_speed = sqrt(vx*vx + vy*vy);
+                    double check_speed = sqrt(vx * vx + vy * vy);
                     double check_car_s = sensor_fusion[i][5];
 
                     check_car_s += ((double) prev_size * .02 * check_speed);
 
                     //check s value greater than mine and s gap
-                    if ((check_car_s > car_s) && (check_car_s - car_s)< 30)  //too close
+                    if ((check_car_s > car_s) && (check_car_s - car_s) < car_speed*0.6)  //too close
                     {
                         too_close = true;
-                    }
-
-                    if (too_close) {
-                        if (lane==1 and CheckLaneAvailability(0, car_s, prev_size, sensor_fusion)) {
-                                lane=0;
-                            }
-                        else if (lane==1 and CheckLaneAvailability(2, car_s, prev_size, sensor_fusion)) {
-                            lane=2;
-                        }
-                        if (lane==0 and CheckLaneAvailability(1, car_s, prev_size, sensor_fusion)) {
-                                lane = 1;
-                        }
-                        if (lane==2 and CheckLaneAvailability(1, car_s, prev_size, sensor_fusion)) {
-                            lane = 1;
-                        }
+                        break;
                     }
                 }
             }
 
+            // changing lane
+            if ((too_close || (car_speed<speed_limit*0.8 && car_speed>25 &&
+                    MinFrontDistance(lane, car_s, sensor_fusion)<50 )) && state==0) {
+
+
+                //on lane 1, choose lane 0 or 2
+                int choice = 0;
+                if (MinFrontDistance(0, car_s, sensor_fusion) < MinFrontDistance(2, car_s, sensor_fusion))
+                {
+                    choice = 2;
+                    cout<<"Choose right side lane first!"<<endl;
+                }
+
+
+                if (lane==1 && state==0 && CheckLaneAvailability(choice, car_s, car_speed, prev_size, sensor_fusion)) {
+                        lane=choice;
+                        target_lane = choice;
+                        state = 1;
+                    }
+                else if (lane==1 && state==0 && CheckLaneAvailability(2-choice, car_s, car_speed, prev_size, sensor_fusion)) {
+                    lane=2-choice;
+                    target_lane = 2-choice;
+                    state = 1;
+                }
+
+                if (lane==0 && state==0 && CheckLaneAvailability(1, car_s, car_speed, prev_size, sensor_fusion)) {
+                    lane = 1;
+                    target_lane = 1;
+                    state = 1;
+                }
+                if (lane==2 && state==0 && CheckLaneAvailability(1, car_s, car_speed, prev_size, sensor_fusion)) {
+                    lane = 1;
+                    target_lane = 1;
+                    state = 1;
+                }
+            }
+
+            cout<<"state:"<<state<<" target_lane:"<<target_lane<<endl;
             if (too_close)
             {
                 ref_vel -= .224;
@@ -447,21 +526,6 @@ int main() {
                 next_x_vals.push_back(x_point);
                 next_y_vals.push_back(y_point);
             }
-
-          	/*
-			double dist_inc = 0.3; // contribute to the average speed
-			for(int i = 0; i < 50; i++)
-			{
-				double next_s = car_s + (i+1) * dist_inc;
-				double next_d = 6;
-				vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-				//next_x_vals.push_back(car_x+(dist_inc*i)*cos(deg2rad(car_yaw)));
-				//next_y_vals.push_back(car_y+(dist_inc*i)*sin(deg2rad(car_yaw)));
-				next_x_vals.push_back(xy[0]);
-				next_y_vals.push_back(xy[1]);
-			}
-             */
-
 
             json msgJson;
 
