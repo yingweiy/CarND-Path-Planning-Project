@@ -381,24 +381,33 @@ int main() {
 
 
                 //on lane 1, choose lane 0 or 2
-                int choice = 0;
-                if (MinFrontDistance(0, car_s, sensor_fusion) < MinFrontDistance(2, car_s, sensor_fusion))
-                {
-                    choice = 2;
-                    cout<<"Choose right side lane first!"<<endl;
-                }
-
-
-                if (lane==1 && state==0 && CheckLaneAvailability(choice, car_s, car_speed, prev_size, sensor_fusion)) {
-                        lane=choice;
-                        target_lane = choice;
-                        state = 1;
+                if (lane==1){
+                    int choice = 1;
+                    double md0 = MinFrontDistance(0, car_s, sensor_fusion);
+                    double md1 = MinFrontDistance(1, car_s, sensor_fusion);
+                    double md2 = MinFrontDistance(2, car_s, sensor_fusion);
+                    if (md0> md2 && md0>md1)
+                    {
+                        choice = 0;
                     }
-                else if (lane==1 && state==0 && CheckLaneAvailability(2-choice, car_s, car_speed, prev_size, sensor_fusion)) {
-                    lane=2-choice;
-                    target_lane = 2-choice;
-                    state = 1;
+                    if (md0 < md2 && md2>md1)
+                    {
+                        choice = 2;
+                        cout<<"Choose right side lane first!"<<endl;
+                    }
+
+                    if (state==0 && CheckLaneAvailability(choice, car_s, car_speed, prev_size, sensor_fusion)) {
+                            lane=choice;
+                            target_lane = choice;
+                            state = 1;
+                    }
+                    else if (state==0 && CheckLaneAvailability(2-choice, car_s, car_speed, prev_size, sensor_fusion)) {
+                            lane=2-choice;
+                            target_lane = 2-choice;
+                            state = 1;
+                    }
                 }
+
 
                 if (lane==0 && state==0 && CheckLaneAvailability(1, car_s, car_speed, prev_size, sensor_fusion)) {
                     lane = 1;
