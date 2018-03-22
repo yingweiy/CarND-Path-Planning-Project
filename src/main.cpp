@@ -219,16 +219,6 @@ bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_si
                 available = false;
                 break;
             }
-
-            if ((check_car_sp > car_sp) && (car_sp > check_car_s))
-            {
-                available = false;
-                break;
-            }
-
-            //check s value greater than mine and s gap
-            //if (abs(check_car_s - car_s) < safe_dist ) {
-            //}
         }
     }
     if (available)
