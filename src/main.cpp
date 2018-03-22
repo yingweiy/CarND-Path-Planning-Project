@@ -208,17 +208,30 @@ bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_si
             check_car_sp = check_car_s + ( t * check_speed);
             car_sp = car_s + (t * car_speed);
 
-            if ((check_car_sp >car_sp) && (car_sp > check_car_s-safe_dist))
+            if ((check_car_sp >= car_sp) && (car_sp >= check_car_s-safe_dist))
             {
                 available = false;
                 break;
             }
 
-            if ((check_car_sp > car_s - safe_dist) && (car_s-safe_dist > check_car_s - safe_dist))
+            if ((check_car_sp >= car_s - safe_dist) && (car_s-safe_dist >= check_car_s - safe_dist))
             {
                 available = false;
                 break;
             }
+
+            if ((car_sp >= check_car_sp) && (car_s <= check_car_s))
+            {
+                available = false;
+                break;
+            }
+
+            if ((car_sp <= check_car_sp) && (car_s >= check_car_s))
+            {
+                available = false;
+                break;
+            }
+
         }
     }
     if (available)
