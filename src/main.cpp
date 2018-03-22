@@ -344,6 +344,7 @@ int main() {
             }
             bool too_close = false;
             bool too_slow = false;
+            double too_close_check_speed = 0;
 
             if (state==1) //if in changing lane state
             {
@@ -370,6 +371,7 @@ int main() {
                     if ((check_car_s > car_s) && (check_car_s - car_s) < car_speed*0.6)  //too close
                     {
                         too_close = true;
+                        too_close_check_speed = check_speed;
                         break;
                     }
                 }
@@ -424,7 +426,7 @@ int main() {
             cout<<"state:"<<state<<" target_lane:"<<target_lane<<endl;
             if (too_close)
             {
-                ref_vel -= .224;
+                ref_vel -= .224 * pow((car_speed-too_close_check_speed)/30.0, 3); //decide the optimal speed to follow
             }
             else if (ref_vel < speed_limit)
                 {
