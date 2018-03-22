@@ -386,11 +386,11 @@ int main() {
                     double md0 = MinFrontDistance(0, car_s, sensor_fusion);
                     double md1 = MinFrontDistance(1, car_s, sensor_fusion);
                     double md2 = MinFrontDistance(2, car_s, sensor_fusion);
-                    if (md0> md2 && md0>md1)
+                    if (md0>= md2 && md0>=md1)
                     {
                         choice = 0;
                     }
-                    if (md0 < md2 && md2>md1)
+                    if (md0<=md2 && md2>=md1)
                     {
                         choice = 2;
                         cout<<"Choose right side lane first!"<<endl;
