@@ -381,7 +381,7 @@ int main() {
 
 
                 //on lane 1, choose lane 0 or 2
-                if (lane==1){
+                if (lane==1 && state==0){
                     int choice = 1;
                     double md0 = MinFrontDistance(0, car_s, sensor_fusion);
                     double md1 = MinFrontDistance(1, car_s, sensor_fusion);
