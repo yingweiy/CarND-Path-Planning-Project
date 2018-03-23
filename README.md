@@ -8,18 +8,122 @@ In this project the goal is to safely navigate around a virtual highway with oth
 ### Algorithmic Details
 
 #### Trajectory generation
-Using spline. with lane parameters
+The trajectory is generated using spline. 
+
+```python
+line 11, code header 
+#include "spline.h"
+
+In the function h.onMessage()
+//create a spline
+tk::spline sp;
+
+//set x,y points to the spline
+sp.set_points(ptsx, ptsy);
+
+// the trajectory points are then predicted by the x_point            
+double y_point = sp(x_point);            
+```
+
+The spline is constructed with the ``lane`` parameter at 30m, 60m, and 90m:
+
+```python
+// In Frenet add evenly 30m spaced points ahead of the starting reference
+vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+vector<double> next_wp1 = getXY(car_s+60, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+vector<double> next_wp2 = getXY(car_s+90, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+```
+
+Then the spline is used to interpolate the points between these anchor points.
 
 #### Acceleration and brake profile
-Initial acceleration - slowly to avoid jerk
+The speed control is based on if the car is too close (too_close) to the car in front of it, as well as
+the speed limit. In the acceleration, as the code shown below, the profile is based on the ref_vel. 
+It is faster when the speed is slow, and slower when the car is already fast enough. 
+```python
+if (ref_vel < speed_limit)
+{
+    ref_vel += .224 * pow(50.0/ref_vel, 0.3); //accerlation is faster when the speed is slow
+}
+```
+
+When the car is too close, the decrease of the speed is depending on the relative speed of the 
+car to the car in front of it. If it is much faster than previous car, the speed decrease would be 
+very fast, otherwise, it will, and may not decrease the speed.
+```python
+if (too_close)
+{
+    ref_vel -= .224 * pow((car_speed-too_close_check_speed)/30.0, 3); //decide the optimal speed to follow
+}
+```
 
 #### States
-two states: keep in lane, changing. parameters: target lane
+The control is time-point-wise, and in order to have a memory, a state variable is necessary.
+I only used two states in the implementation: keep in lane (0) and lane changing (1). 
+However, for the lane changing, there is a parameter associated with this state, target_lane.
+
+When the car decides to lane changing and the target lane is safe to do so, it will set the 
+state variable to 1 (lane changing), and keep in the state until entered the target lane. Then the 
+state is back to 0. 
+
 
 #### Lane changing strategy
 
 ##### Safety
-Gap checking with projected position of both car and checked cars.
+Gap checking with projected position of both car and checked cars in function below. A ```safe_distance```
+variable is defined to allow the sufficient gap size (including the size of the car body's). 
+A estimated time (2 second) of lane changing is used to project the location of the car.
+```python
+bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_size, const vector<vector<double>> &sensor_fusion) {
+    bool available = true;
+    double safe_dist = 10;
+
+    for (int i = 0; i<sensor_fusion.size(); i++)
+    {
+        // car is in my lane        
+        float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
+        if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in the lane
+        {
+            double vx = sensor_fusion[i][3];
+            double vy = sensor_fusion[i][4];
+            double check_speed = sqrt(vx*vx + vy*vy);
+            double check_car_s = sensor_fusion[i][5];
+            //double t = (double) prev_size * .02;
+            double t = 2; //assume two seconds lane changing
+            double check_car_sp; //projected check_car_s
+            double car_sp;  //projected car_s
+            check_car_sp = check_car_s + ( t * check_speed);
+            car_sp = car_s + (t * car_speed);
+
+            if ((check_car_sp >= car_sp) && (car_sp >= check_car_s-safe_dist))
+            {
+                available = false;
+                break;
+            }
+
+            if ((check_car_sp >= car_s - safe_dist) && (car_s-safe_dist >= check_car_s - safe_dist))
+            {
+                available = false;
+                break;
+            }
+
+            if ((car_sp >= check_car_sp) && (car_s <= check_car_s))
+            {
+                available = false;
+                break;
+            }
+
+            if ((car_sp <= check_car_sp) && (car_s >= check_car_s))
+            {
+                available = false;
+                break;
+            }
+
+        }
+    }    
+}
+```
 
 ##### Optimization
 Lane 1 has a choice function to choose from lane 0 or lane 2
