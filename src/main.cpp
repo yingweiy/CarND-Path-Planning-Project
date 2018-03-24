@@ -188,7 +188,7 @@ double MinFrontDistance(int lane, double car_s, const vector<vector<double>> &se
 
 bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_size, const vector<vector<double>> &sensor_fusion) {
     bool available = true;
-    double safe_dist = 10;
+    double safe_dist = 5;
 
     for (int i = 0; i<sensor_fusion.size(); i++)
     {
@@ -202,19 +202,19 @@ bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_si
             double check_speed = sqrt(vx*vx + vy*vy);
             double check_car_s = sensor_fusion[i][5];
             //double t = (double) prev_size * .02;
-            double t = 2; //assume two seconds lane changing
+            double t = 1.0; //assume two seconds lane changing
             double check_car_sp; //projected check_car_s
             double car_sp;  //projected car_s
             check_car_sp = check_car_s + ( t * check_speed);
             car_sp = car_s + (t * car_speed);
 
-            if ((check_car_sp >= car_sp) && (car_sp >= check_car_s-safe_dist))
+            if ((check_car_sp >= car_sp) && (car_sp >= check_car_s))
             {
                 available = false;
                 break;
             }
 
-            if ((check_car_sp >= car_s - safe_dist) && (car_s-safe_dist >= check_car_s - safe_dist))
+            if ((check_car_sp >= car_s - safe_dist) && (car_s-safe_dist >= check_car_s))
             {
                 available = false;
                 break;
