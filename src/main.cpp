@@ -188,7 +188,7 @@ double MinFrontDistance(int lane, double car_s, const vector<vector<double>> &se
 
 bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_size, const vector<vector<double>> &sensor_fusion) {
     bool available = true;
-    double safe_dist = 5;
+    double safe_dist = 10;
 
     for (int i = 0; i<sensor_fusion.size(); i++)
     {
@@ -202,7 +202,7 @@ bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_si
             double check_speed = sqrt(vx*vx + vy*vy);
             double check_car_s = sensor_fusion[i][5];
             //double t = (double) prev_size * .02;
-            double t = 1.0; //assume two seconds lane changing
+            double t = 2.0; //assume two seconds lane changing
             double check_car_sp; //projected check_car_s
             double car_sp;  //projected car_s
             check_car_sp = check_car_s + ( t * check_speed);
@@ -429,7 +429,10 @@ int main() {
             cout<<"state:"<<state<<" target_lane:"<<target_lane<<endl;
             if (too_close)
             {
-                ref_vel -= .224 * pow((car_speed-too_close_check_speed)/30.0, 3); //decide the optimal speed to follow
+                double speed_reduction = pow((car_speed-too_close_check_speed)/30.0, 3);
+                if (speed_reduction<1.0)
+                    speed_reduction = 1.0;
+                ref_vel -= .224 * speed_reduction; //decide the optimal speed to follow
             }
             else if (ref_vel < speed_limit)
                 {

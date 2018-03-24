@@ -73,7 +73,7 @@ state is back to 0.
 ##### Safety
 Gap checking with projected position of both car and checked cars in function below. A ```safe_distance```
 variable is defined to allow the sufficient gap size (including the size of the car body's). 
-A estimated time (1 second) of lane changing is used to project the location of the car.
+A estimated time (2 seconds) of lane changing is used to project the location of the car.
 ```python
 bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_size, const vector<vector<double>> &sensor_fusion) {
     bool available = true;
@@ -90,7 +90,7 @@ bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_si
             double check_speed = sqrt(vx*vx + vy*vy);
             double check_car_s = sensor_fusion[i][5];
             //double t = (double) prev_size * .02;
-            double t = 1; //assume two seconds lane changing
+            double t = 2; //assume two seconds lane changing
             double check_car_sp; //projected check_car_s
             double car_sp;  //projected car_s
             check_car_sp = check_car_s + ( t * check_speed);
