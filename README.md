@@ -73,7 +73,7 @@ state is back to 0.
 ##### Safety
 Gap checking with projected position of both car and checked cars in function below. A ```safe_distance```
 variable is defined to allow the sufficient gap size (including the size of the car body's). 
-A estimated time (2 second) of lane changing is used to project the location of the car.
+A estimated time (2 seconds) of lane changing is used to project the location of the car.
 ```python
 bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_size, const vector<vector<double>> &sensor_fusion) {
     bool available = true;
@@ -126,8 +126,33 @@ bool CheckLaneAvailability(int lane, double car_s, double car_speed, int prev_si
 ```
 
 ##### Optimization
-Lane 1 has a choice function to choose from lane 0 or lane 2
+For lane changing at Lane 1, there is a choice function to choose from lane 0 or lane 2.
+A function ```MinFrontDistance``` is defined to check the closest car in the front in the target 
+lane. The first choice of the lane is the one with more empty space. 
 
+```python
+double MinFrontDistance(int lane, double car_s, const vector<vector<double>> &sensor_fusion) {
+    double mindist = 1e4;
+    double dist = 1e4;
+    for (int i = 0; i<sensor_fusion.size(); i++)
+    {
+        float d = sensor_fusion[i][6];  //the i-th car's displacement (lane position)
+        if ((d < 2 + 4 * lane + 2) && (d> 2+4*lane-2))   //if the car is in the lane
+        {
+            // car is in the lane
+            double check_car_s = sensor_fusion[i][5];
+            if (check_car_s>car_s)
+            {
+                dist = check_car_s - car_s;
+            }
+            if (dist < mindist){
+                mindist = dist;
+            }
+        }
+    }
+    return mindist;
+}
+```
    
 ### Simulator.
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases).
